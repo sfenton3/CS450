@@ -1,0 +1,126 @@
+;;Homework Questions
+
+3.a 
+
+fact-i
+n  | Total Pushes | Maximum-depth | Difference
+---------------------------------------------
+0  |  29          | 10            | 29
+1  |  64          | 10            | 35
+2  |  99          | 10            | 35
+3  |  134	  | 10            | 35
+4  |  169	  | 10            | 35
+5  |  204	  | 10            | 35
+
+The Maximum-depth value is 10 for each value of "n" in (factorial n).
+
+3.b
+
+The formula to determine the total number of stack pushes is
+f(n) = 35n + 29 for n is greater or equal to 1.
+
+
+4.
+
+fact-r
+n  | Total Pushes | Maximum-depth | Difference
+---------------------------------------------
+1  |  16          | 8             | 16
+2  |  48          | 13            | 32
+3  |  80          | 18            | 32
+4  |  112         | 23            | 32
+5  |  144         | 28            | 32
+
+
+The formula to determine the total number of stack pushes is
+f(n) = 32n - 16 for n is greater or equal to 1.
+
+The formula to determine the maximum depth is calculated by
+f(n) = 5n + 3 for n is greater or equal to 1.
+
+
+5.
+
+After changing the code in eval-sequence to no longer be tail
+recursive, we get the following tables:
+
+fact-i
+n  | Total Pushes | Maximum-depth | Difference pushes | Difference depth
+------------------------------------------------------------------------
+1  |  70          | 17            | 37                | 3
+2  |  107         | 20            | 37                | 3
+3  |  144         | 23            | 37                | 3
+4  |  181         | 26            | 37                | 3
+5  |  218         | 29            | 37                | 3
+
+The total pushes is represented as:
+f(n) = 37n + 33
+
+The Maximum-depth is represented as:
+f(n) = 3n + 14
+
+
+fact-r
+n  | Total Pushes | Maximum-depth | Difference Pushes | Difference depth
+-------------------------------------------------------------------------
+1  |  18          | 11            | 18                | 11
+2  |  52          | 19            | 34                | 8
+3  |  86          | 27            | 34                | 8
+4  |  120         | 35            | 34                | 8
+5  |  154         | 43            | 34                | 8
+
+
+The total pushes is represented as:
+f(n) = 34n - 16
+
+The Maximum-depth is represented as:
+f(n) = 8n + 3
+
+
+;;Discussion Essay
+
+  I decided to solve problem 1 of the assignment. This problem ended up being
+pretty easy, with a few tricky parts. I copied some of my code from homework 6
+over to the eceval-support.scm file to add the special-form table, and the
+install-special-form procedure. Creating the "type-of?" procedure was simple,
+and just consisted of returning true if the symbol was found in the special-form
+table, and false otherwise. I added a check above "variable?" to see if it was a
+bare special form symbol before I checked if it was a variable. This let me
+print the special form back to the user, in the same was a variable would be
+printed back to the user.
+
+  The tricky part of the assignment was figuring out how to assign a register
+value to a label in regsim.scm. Even though the assignment told me where to put
+the code, it was not easy to figure out what to change. I ended up creating
+another cond clause that checked if the tagged-list was a label, and if the
+"cadr" of the list was a list itself. If it was a list, then that would mean the
+expression must be a register. After I got the cond clause in regsim.scm to test
+for "(reg val)" working, I created code to check if the register contents of the
+val register was a label, and to be able to jump to that location if it was a
+label.
+
+  Problems 3,4, and 5 were straightforward, and only required me to test the
+iterative and recursive factorial procedure until I got a good number of cases
+to test against. I noticed that I could do (factorial 0) with that fact-i
+procedure but if I did that with the recursive procedure it would create an
+infinite loop. Being able to run (factorial 0) made it easier to calculate the
+formula because it told you the value of one of the constants.
+
+  I tested my code for problem 1 by making sure that I could run any of the
+special forms as I would have previously been able to. This meant that I tried
+each special form, as well as some of the given procedures for problem 3 and
+4. I also tested that If I input a bare symbol like "set!" it would not return a
+unbound variable error like it did previously. I solved this by putting a test
+before the variable check that tested if the symbol was in the special forms
+table, and if so I would store the contents of the "exp" register to the "val"
+register, and goto the read-eval-print loop.
+
+  I attempted the second problem, but I did not understand how the save and
+restore worked, so I had difficulties with figuring out how to actually do the
+problem. When I was prototyping the problem, I started by tying to extract the
+predicate from the cond expression, and evaluate that to true of false. However,
+in the register machine there was no way for me to actually evaluate the
+predicate, so I kept getting erroneous true or false values. If I were to solve
+it, I would have a label to evalute each predicate for true or false. If a true
+value was found, I would extract the cond clause, and send it to ev-sequence to
+evaluate each expression in the clause until it was empty.

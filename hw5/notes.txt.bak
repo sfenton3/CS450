@@ -1,0 +1,158 @@
+;;Answers to questions from HW
+
+1.1 Table from figure 18
+---------------------------------------------------------------------------
+		 Output stream	 a    a-list	pow	Input Stream
+                         ( )	( )	()	--      (9 8 7 4 3 6 9 1 7)
+a-list is empty;consume
+                         ( ) 	783	(783)	100     (8 7 4 3 6 9 1 7)
+87+83 >= 100  ;consume
+                         ( )	8526	(8526)	1000	(7 4 3 6 9 1 7)
+87+526 < 1000 ;produce
+               		 (8)	526	(526) 	100	(7 4 3 6 9 1 7)
+87+26 >= 100  ;consume		
+			 (8)	5869	(5869)	1000	(4 3 6 9 1 7)
+87+869 < 1000 ;produce
+			 (85)	869	(869)	100	(4 3 6 9 1 7)
+87+69 >= 100  ;consume
+                         (85)   9038    (9038)  1000    (3 6 9 1 7)
+87+38 < 1000  ;produce
+                        (859)   38      (038)   100     (3 6 9 1 7)
+87+38 >= 100  ;consume
+                        (859)   641     (0641)  1000    (6 9 1 7)
+87+641 < 1000 ;produce
+                        (8590)  641     (641)   100     (6 9 1 7)
+87+41 >= 100  ;consume
+                        (8590)  6932    (6932)  1000    (9 1 7)
+87+932 >= 1000;consume
+                        (8590)  70103   (70103) 10000   (1 7)
+87+103 < 10000;produce
+                        (85907) 103     (0103)  1000    (1 7)
+87+103 < 1000 ;produce
+                        (859070) 103    (103)   100     (1 7)
+87+3 < 100    ;produce
+                        (8590701) 3     (03)    10      (1 7)
+87+3 >= 10    ;consume
+                        (8590701) 117   (117)   100     (7)
+87+17 >= 100  ;consume
+                        (8590701) 1779  (1779)  1000    ()
+                        
+Append a-list to end of finite stream(85907011779)
+
+
+2.1 Do the computations starting with 3 instead of 2, and show that this seems
+to be true.
+
+2 + 1/3(3) = 3
+2 + 1/3(2 + 2/5(3)) = 3.066666667
+2 + 1/3(2 + 2/5(2 + 3/7(3)))) = 3.1047619047619
+2 + 1/3(2 + 2/5(2 + 3/7(2 + 4/9(3))))) = 3.1238095238095
+2 + 1/3(2 + 2/5(2 + 3/7(2 + 4/9(2 + 5/11(3))))) = 3.1330447330447
+2 + 1/3(2 + 2/5(2 + 3/7(2 + 4/9(2 + 5/11(2 + 6/13(3)))))) = 3.1374847374847
+
+We can see from the above that any value lower than pi, approaches pi as the
+sequence gets larger. I also tested this with the value of 4, and it approaches
+pi by decreasing, instead of increasing.
+ 
+2.2 What is the matrix corresponding to the fractional linear transformation
+that taxes x as an input, adds 3 to it, and then takes the reciprocal of that
+result?
+
+f(x) = 1/(x + 3)
+
+Below is the matrix A corresponding to the to the fractional linear
+transformation:
+
+A = | 0 1 |
+    | 1 3 |
+
+2.3 Middle of page 55, prove the statement.
+
+We can show that f composition g is the same as matrix multiplication of AB.
+
+Given two functions:
+f(x) = (ax + b)/(cx + d)
+g(x) = (ex + f)/(gx + h)
+
+The composition of f and g is:
+= (a (ex + f/ gx + h) + b) / (c (ex + f / gx + h) + d)
+= ((aex + af / gx + h) + (bgx + bh / gx + h)) /
+          ((cex + cf / gx + h) + (dgx + hd / gx + h))
+= ((aex + bgx + af + bh) / (gx + h)) / ((cex + dgx + cf + hd) / (gx + h))
+
+We can see that (gx + h) is common in both the numerator and denominator, so we
+cancel out and reduce the expression.
+
+= (aex + bgx + af + bh) / (cex + dgx + cf + dh)
+= ((ae + bg)x + (af + bh)) / ((ce + dg)x + (cf + dh))
+
+f(x) composition g(x) = ((ae + bg)x + (af + bh)) / ((ce + dg)x + (cf + dh))
+
+Now we show that the linear fractional transformation represented as a Matrix A
+and a Matrix B multiplied together equal the above expression.
+
+A = | a b |
+    | c d |
+
+B = | e f |
+    | g h |
+
+AB = | a b | * | e f | = | (ae + bg) (af + bh) |
+     | c d |   | g h |   | (ce + dg) (cf + dh) |
+
+Translating back to a fractional linear transformation gives:
+AB = ((ae + bg)x + (af + bh)) / ((ce + dg)x + (cf + dh))
+
+This is the same as the composition of f(x) and g(x) shown in the above
+expression. Proving that the composition of f(x) and g(x) is the same as the
+fractional linear transformation of f(x) and g(x) turned into matrices A and B,
+multiplied together, then turned back into a fractional linear transformation.
+
+;;Essay Response:
+        I started with problem two, which required us to create a procedure that
+produced a stream consisting of the digits of pi. I thought this would be more
+interesting to work on. The easiest part of this problem was creating the
+selectors, constructors and matrix arithmetic procedures. I knew from the
+beginning that I would need a procedure to translate a matrix into a fractional
+linear transformation, and to find the quotient. These procedures turned out to be
+simple to create, and test. 
+       I found it very difficult to read and extract the information needed from
+the academic paper. I ended up asking a lot of questions in class to figure out
+how "a" was calculated and how the stream consisting of matrices was built. I do
+not think I would have figured out how the mathematics worked unless I asked
+these questions in class. The procedures to build the matrix stream ended up
+being simple after I understood the math behind it. I ended up using the
+infinite stream of "ones" as a template to build out the pi stream.
+       The procedure pi only consisted of two procedures, one procedure consumed
+matrices of the matrix-stream, until it produces a digit of pi. The other
+procedure used the "produce-pi" procedure as a recursive function to create the
+infinite stream consisting of the digits of pi. The procedure "stream-pi" that
+created a stream consisting of the digits of pi was relatively simple to create
+once the "produce-pi" procedure worked.  The "produce-pi" procedure took a
+matrix and a stream, and solved them until it could produce a digit of pi. Once
+a digit of pi was produced, it would return the value of the digit, as well as
+the information needed to return back to the recursive procedure if it needed to
+compute more digits of pi.  I thought that this was an elegant way of using
+recursion, because we never needed to recalculate something we previously
+calculated. It also reused the same function, but when we input the new values,
+it just continued where it left off previously.
+       The solution to the "pi" procedure helped me in creating the
+"mult-stream" procedure. I knew conceptually that I wanted to do something
+similar to how I solved "pi". I ended up essentially reusing part of the
+solution to problem two. I created a procedure "produce-strm" that consumed the
+input "strm" until it "produced", or if it was a finite "strm", I would consume
+until the "strm" was empty. This was slightly more complicated than the "pi"
+procedure because I could not assume that the stream would be infinite as in
+problem two. We could have an infinite or finite stream, but would not know
+until we hit the-empty-stream. This meant that within the procedure
+"produce-strm" I had to check for the empty stream, as well as the conditions to
+either consume or produce. If the stream was empty I would append the remaining
+digits in "a-list" onto the stream, then eventually return the finite stream.
+       I thought that problem one was much harder than problem two, because we
+had to handle the finite stream. I ran into all sorts of problem because it was
+difficult to evaluate if the promise contained the empty-list. I ended up using
+"force" to evaluate the stream-cdr without producing an error.
+       I tested mult-stream by using the example stream from class, as well as a
+few obvious finite streams that when multiplied together would represent
+ordinary multiplication. I utilitzed the infinite stream pi from problem two to
+multiply pi by m, and tested my result with various calculated resulted.

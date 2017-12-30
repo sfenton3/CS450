@@ -1,0 +1,56 @@
+;;Discussion Essay
+
+  A part of the assignment that I found difficult was testing. There were few
+examples of different register machines to use, so I mostly tested with
+gcd-machine and a register machine that I created myself. I also had difficulty
+dealing with the breakpoints and labels because I created a register to store
+them instead of a local variable. By the time I realized that it was better to
+use a local variable, It was too late to change large portions of my code. If I
+was to do this assignment again, I would change how I designed my solution,
+because it was not very readable, and felt a little bit hacky. I had too much
+code that were single use procedures, and procedures that would not be obvious
+to the user what their purpose was.
+
+  For extra credit problem 5.8, my solution for detecting duplicate labels, was
+to store each label in a list. Each time a label was inserted into the list, it
+would check if any other item in the list matched, and if so it would throw an
+error. Then after extract-label finished, it would set the global variable that
+held each label to the empty list, so if any other register machines were
+created, there would not be conflicting code to throw false errors. Problem 5.9
+was very simple, all we needed to do was to check if the list was tagged with a
+label, and if that was found we would throw an error.
+
+  The approach I took to solving problem 5.19 was to solve it piece by piece
+until I was able to get the whole problem to work correctly. I started by
+creating a procedure to continue the machine once it stopped running because it
+hit a breakpoint. This was easy to do, and all I needed was to pass a message to
+the make-machine function that told the function to "execute" without reseting
+any of the registers.
+
+  I created a register to hold the labels, by returning the original labels from
+extract label, and storing that in the machine register. Then I iterated through
+the labels, and assigned them to a number corresponding to the the instruction
+sequence. The instruction sequence was created by taking each member of the
+instruction list and assigning it to a number starting from 1, and ending with
+the last item in the list.
+
+  The next problem I solved was dealing with seting breakpoints. I tackled this
+problem by looking at the corresponding labels, and took the offset of the
+label, and added it the value corresponding to the first instruction after the
+label. This meant that If I was given a label 'test-b that started at
+instruction 7, and it had an offset of 3. Then the procedure would know to stop
+at instruction 10. It was a bit tricky to print the label and offset, instead of
+the instruction sequence, but only required me to translate back in the same way
+I translated it in the first place.
+
+  Canceling individual breakpoints was complicated because I needed to remove the
+breakpoint from the breakpoint register, and I needed to change the list the
+mapped the offset to the instruction sequence value. This meant that Even though
+I could remove the breakpoint, I needed to recalculate the mapped breakpoints
+each time I removed a breakpoint. I solved this problem by recreating the mapped
+breakpoint list each time execute was called.Canceling all of the breakpoints
+was much easier than canceling each breakpoint individually. All I needed to do
+to accomplish this was to set the register the held the breakpoints to the empty
+list.
+
+  

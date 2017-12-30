@@ -1,0 +1,31 @@
+;;Discussion Essay
+
+  For part one, I added procedures in Syntax.scm to create the conversion from
+or to if, and let to a lambda. To translate an "or" expression to an "if"
+expression, I created a nested if statement similar to a cond expression. So
+each predicate was tested, until a value that returned true was found, then that
+value was returned. For this I used some of the code from the cond->if
+procedure, because it also applied to or->if. To make it work in compiler.scm I
+added a "or?"  predicate that checked if the tagged-list was "or" and if so it
+would invoke the "or->if" procedure.
+
+  For the let->appl, I added a procedure in syntax.scm to create the conversion
+from "let->appl" which turned out to simply be a conversion from
+"let->lambda". The form of the let was one big lambda expression that had the
+arguments be the local variables, the body be the body of the procedure. I
+created a procedure "let?" that checked if the tagged-list of "exp" was a let
+expression, and if so I would invoke the "let->appl" procedure.
+
+  I looked up the definitions of "or" and "let" in R5RS and it did help me in
+figuring out how to implement these special forms. I found that the "or"
+expression is evaluated from left to right, and the first true value is then
+returned. I found out that let just wraps everything in a lambda and turns the
+variables into arguments and the body of procedure into the body of a lambda.
+
+  As for the course itself, I really enjoyed learning a functional programming
+lanuage, and I am sure I will be using what I have learned in the course further
+in my career. If we had more time, I would have enjoyed if we could venture into
+compiler security, and how one would be able to protect a programming
+language. I do not know how feasible that would be, but I got some experience
+with security in another class I took this semester, and think it would be an
+interesting topic to approach.

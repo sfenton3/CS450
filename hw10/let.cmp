@@ -1,0 +1,16 @@
+((env continue)
+ (val)
+ (val)
+ (
+  (assign val (op make-compiled-procedure) (label entry1) (reg env))
+  (goto (reg continue))
+ entry1
+  (assign env (op compiled-procedure-env) (reg proc))
+  (assign env (op extend-environment) (const (x y)) (reg argl) (reg env))
+  (assign val (op lookup-variable-value) (const *) (reg env))
+  (assign val (op lookup-variable-value) (const x) (reg env))
+  (assign val (op lookup-variable-value) (const x) (reg env))
+  (goto (reg continue))
+ after-lambda2
+ )
+)

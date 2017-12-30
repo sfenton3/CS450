@@ -1,0 +1,57 @@
+;;Answers to Homework Questions
+
+Do you need to make any changes to define-variable!?
+
+We do not need to make changes to define-variable! because the way that delay
+and reference are implemented mean that the variable with a delayed or
+referenced tag go into the values list as a thunk or special object. If we
+reference one variable with another variable, then we never have to change the
+actual value.
+
+;;Discussion Essay
+
+  I did part two first, and it was not difficult. At first I was confused about
+how to use the call/cc function, but after looking at the save_continuation
+example from class it made more sense. I thought of the call/cc procedure like a
+goto function, everything followed from that. I wrote s450error similar to UMB
+Scheme error, but instead of the last expression being a (newline), my last line
+was an expression that utilized that call/cc variable to goto the (s450)
+prompt. My goto label was held in a variable called "goto-s450". so the last
+line was just (goto-s450 exp).
+  The second part of part two asked us to return the user to the UMB Scheme
+environment if they used the special form exit. I implemented this by finding a
+procedure that occurred before we enter (s450), and put a call/cc procedure in
+that part of the code. I ended up modifying the start message "..loading the
+metacircular" and wrapping it in a procedure "start-message" that would display
+that message, and after would place a call/cc procedure that would be utilized
+if the eof-object? was found or you used the exit primitive procedure. This
+returned the user to the UMB Scheme where the original message was found.
+  After finishing the second part of Homework 7, I started working on the first
+part. I began with delayed arguments. The idea behind delayed arguments, is that
+before I evaluate the user-defined procedure, I remove the delayed argument from
+the procedure parameters, and insert the thunk-object into the values list of
+the new frame. So if the procedure has parameters x and delayed y, and the
+values are 1 and 2, then the new frame will have variables x,y and values 1 and
+a thunk-object containing the 'thunk tag, the expression and the environment it
+was born in. The idea is that if we ever need to evaluate the thunk object, then
+all we need to do is put the second and third item in the thunk-object back into
+xeval.
+  For the dynamic tag, I utilized a new environment called the dynamic
+environment. If xtend-environment was ever called, then I would put a new frame
+in the current environment, and cons it onto the dynamic environment as well.
+However, if eval-sequence ended then I would pop the frame off of the dynamic
+environment and return the value from eval-sequence.
+  For the reference tag, I did something similar to the delay tag, however the
+referenced expression would only change if set! or define were used. The
+referenced variable would be stored in the values list as a list itself with a
+tag of reference. If the referenced variable was needed it would retrieve the
+value like normal. But if the referenced value was being changed it would change
+the value in the reference list.
+  I tested the delayed parameter by creating a procedure that took in two
+arguments x, and (delayed y). x was 1, and y was an expression that produced a
+floating point error. If the delay works correctly, using an erroneous argument
+will not produce an error if it has the delayed tag. I tested the other
+expressions using the examples given on the homework page. I the call/cc by
+making sure that if an error occurred that should return the user to (s450) it
+would do so, and if the eof-object? was found or a user typed (exit), then it
+would return the user back to the UMB scheme interpreter.

@@ -1,0 +1,96 @@
+;;Answers to questions from website:
+Given a "from" quantity and a "to" Unit-list. We can transform those into two
+quantity lists, with the "from" quantity list having an additional scalar "a".
+
+(normalize from) -->  (u U-normalized)
+(normalize to)   -->  (v V-normalized)
+However, since the "from" quantity contains a scalar value, when the units are
+normalized, I apply that value to the resulting normalized quantity. This
+yields:
+
+(au U-normalized) = v V-normalized
+U = (au/v) V
+U is the convert value, and V is the original unit-list.
+(au/v) is the ratio that converts "from" to "to".
+
+Example of "convert" procedure:
+(convert '(10 (mi 1)(hr -1)) '(km 1)(day -1))
+(normalize '(mi 1)(hr -1))  --> (.44704 (m 1)(sec -1))
+(normalize '(km 1)(day -1)) --> (.01157 (m 1)(sec -1))
+
+We multiply the scalar 10 by the normalized "from" quantity.
+(10 * .44704)(m 1)(sec -1) = .01157 (m 1)(sec -1)
+(4.4704 (m 1)(sec -1) = .01157 (m 1)(sec -1)
+(10 * .44704)/.01157 (km 1)(day -1)
+(386.24 (km 1)(day -1))
+
+We can see that the "from" to "to" value is a constant multiple of some
+base-units to some other base-units.
+
+Concerning the reason we use the quote special form. It is easier to input lists
+in the quote form, than nesting many lists to make the correct expression.
+
+;;Essay response:
+
+        While working through this homework assignment, I thought a few of the
+procedures were relatively simple. I knew from the onset that the "convert"
+procedure should have to normalize the "from" and "to" units, then compare if
+they were equal, and finally evaluate the conversion. Conceptual, this seemed
+the most logical way to go about it, and it allowed the main procedure to have
+very few lines of code. I started with the easiest procedures, "compatible?" and
+the lookup procedure "find". "Compatible?" was simple because I knew that the
+normalized unit-list would be in a form where all I had to do was compare the
+three base-unit lists for equality. The "find" procedure was simple because most
+of the code was given to use, and all I had to do was figure out the right order
+of "car" and "cdr" to get the correct return value. It was just a bit of trial
+and error.
+      The toughest part of the homework assignment was figuring out how I would
+go about normalizing a unit-list. At first I thought I could have the procedure
+"normalize" with both a "value" and "unit-list" argument because each unit-list
+was implicitly a quantity with value 1. But, after thinking of taking that
+approach, I decided it would be less confusing to have the "normalize" procedure
+only take a unit-list, and deal with the quantity value in the main procedure
+"convert". About 80% of my code was in the normalize procedure, and I broke it
+into a number of procedures and helper procedures. The main procedures in
+"normalize" were "norm-quantity" that reduced a unit-list to the base-units, and
+a value associated with those base-units. Then that result got funneled into a
+procedure "simplify" that reduced the unit-list itself into three or less units
+of m/kg/sec. At first I thought that the complex units to base-units would be
+complicated because we had to deal with the exponents, but I solved it with a
+modified map procedure. The modified map procedure evaluated the nested lists
+and multiplied the "cdr" of each list with the parent exponent value.
+         I would not say I made any large mistakes. I thought about the
+architecture of the convert procedure and planned out the code carefully to
+avoid any large mistakes. I had the option of taking two different fundamental
+approaches with the normalize procedure, and decided that the normalize
+procedure would only take a unit-list as an argument, opposed to a more
+complicated unit-list and value argument. This meant that in the main procedure
+"convert" I dealt with calculations that may have been better placed in the
+normalize procedure.
+        If I could do the assignment again I might take look at the normalize
+procedure and make it simpler. I would also refactor my code more.  I felt my
+code was not as explicit as it could have been, in the sense that I may have
+used "car" and "cdr" in places where it could have been abstracted out. I also
+created my own map procedure to do an awkward maping of nested lists, and
+perhaps there was a more convenient procedure from the book I did not think of.
+        If I had more time, I would extend this code to allow the output, to be
+formatted in a more user-friendly form. This would be relatively simple, and
+would only require a procedure to determine the preferred output language, and
+another procedure to take the final converted form, and translate it into
+English or another language. the translation from converted number to the
+preferred language, could take the form of templates that checked for common
+scenario's and placed the number and unit-list into those places.
+          The testing of "convert" was difficult, and I was unsure of how to
+fully test everything. I still do not really know if I tested each situation. I
+covered simple units to simple units, and that worked as expected. I tested
+complex units to basic units, complex units to complex units, simple units to
+complex units, along with many other test-cases. I made sure the "convert"
+procedure worked for most situations.  When testing from basic units to basic
+units, I caught a few errors because I did not handle what happens if a unit was
+not in "source". After I changed it so that if searching "source", the unit was
+not found then the procedure returned an empty list.I did not know how to handle
+a "from" to "to" if the "to" unit-list was in a redundant form. I did not assume
+to know what the user would want the final form to be in, so if the user
+requested the "to" unit-list to be '((mi 1)(mi 1)(sec -1)) or '((mi 0)(hr -1)),
+and the conversion was possible, then I would return the final result in that
+form.

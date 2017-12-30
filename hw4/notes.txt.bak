@@ -1,0 +1,50 @@
+;;Answers to questions from website:
+Question: How do we know that there are only finitely many paths from start to end?
+
+      We know that there are finitely many paths from start to end because
+every time we go from one node to another node, we reduce the total number of
+paths in the graph that can be searched. A Directed Acyclic graph never loops,
+so we know that every node searched reduces the number of paths left to search.
+
+Question: How many paths are there from start to end in that dag?
+
+      We can see visually that every level down the DAG doubles the number
+of paths searched. At start we have one path (2^0), and by the end we have (2^8)
+paths, which is 256 different paths searched.
+
+
+;;Essay Response:
+
+      I started with the naive-cost procedure and solved it with a number of
+helper procedures. I used a procedure "calculate-cost" to help keep track of the
+double recursion, and a procedure "naive" to start the double recursion. The
+helper procedures consisted of selectors to help extract values from the
+node-list and a procedure to find the start node. Even with the psudo-code, I
+found the double recursion to be tricky. I used a helper procedure
+"calculate-cost" to keep track of each path that was calculated. For
+"naive-cost" I did not need to implement a lookup procedure, and ended up just
+using the method from homework 3 to search the file.
+      I did notice that the "naive-cost" procedure took a very long time to run
+on the UMB enviornment. I calculated the run of the dist.dat file to be 16
+seconds on the UMB machine, and my home machine calculated it in about a
+second. Even though the "naive-cost" procedure worked, I think I may have done
+the double recursion in a way that was even more inefficient than it should have
+been.
+      The "cost" solution was far more difficult than the first part, and this
+is where I spent most of my time. I started with building out the 2D tables that
+would be needed. I created the lookup procedure, and created two tables "path"
+and "short-path". "path" would hold the original nodes from "dist.dat" file, and
+"short-path" would hold the shortest distance between any two nodes in the
+graph.  Each time that "calculate-cost" would return a value, it would check if
+there was a path already in place, and if not then it would store that value in
+the "path" table. This minimized the number of calculations that needed to be
+repeated.
+      Even though I did not end up finishing the "cost" procedure, I do have an
+understanding of how I could solve it conceptually. Given a shortest path value,
+I could find the path of minimal cost by looking up each node in "short-path"
+table that gave me the final value, and utilize a third table that would expand
+the short-path each time a shortest path was found, and insert the expanded
+version into a third table. This would turn the "short-path" key1 and key2
+values into a combined key, and the expanded path into a value. This would allow
+us to look up the expanded version of the shortest path between two nodes, in
+the third table, and not have to calculate anything again.

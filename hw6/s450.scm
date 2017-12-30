@@ -1,0 +1,706 @@
+;;; file: s450.scm
+;;;
+;;; Metacircular evaluator from chapter 4 of STRUCTURE AND
+;;; INTERPRETATION OF COMPUTER PROGRAMS (2nd edition)
+;;;
+;;; Modified by kwn, 3/4/97
+;;; Modified and commented by Carl Offner, 10/21/98 -- 10/12/04
+;;;
+;;; This code is the code for the metacircular evaluator as it appears
+;;; in the textbook in sections 4.1.1-4.1.4, with the following
+;;; changes:
+;;;
+;;; 1.  It uses #f and #t, not false and true, to be Scheme-conformant.
+;;;
+;;; 2.  Some function names were changed to avoid conflict with the
+;;; underlying Scheme:
+;;;
+;;;       eval => xeval
+;;;       apply => xapply
+;;;       extend-environment => xtend-environment
+;;;
+;;; 3.  The driver-loop is called s450.
+;;;
+;;; 4.  The booleans (#t and #f) are classified as self-evaluating.
+;;;
+;;; 5.  These modifications make it look more like UMB Scheme:
+;;;
+;;;        The define special form evaluates to (i.e., "returns") the
+;;;          variable being defined.
+;;;        No prefix is printed before an output value.
+;;;
+;;; 6.  I changed "compound-procedure" to "user-defined-procedure".
+;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;;	 xeval and xapply -- the kernel of the metacircular evaluator
+;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (xeval exp env)
+  (let ((action (lookup (type-of exp) special-form)))
+    
+  (cond ((self-evaluating? exp) exp)
+        
+        ;;Checks if exp is a symbol, and that the symbol is in the special form
+        ;;table. If so, we return the special form.
+        ((AND (symbol? exp) (not (equal? (lookup exp special-form) #f)))
+         (display "Special form: ") exp)
+        ((variable? exp) (lookup-variable-value exp env))
+        
+        ;;Checks if the expression is trying to use define or set!. If define or
+        ;;set! is being used on a special-form, an error is thrown.
+        ((AND(OR (definition? exp) (assignment? exp))
+             (NOT (equal? (lookup (car (cdr exp)) special-form) #f)))
+         (error "Cannot redefine/assign special form -- " (car (cdr exp))))  
+
+        ;;If the lookup procedure returns a special form, we evaluate
+        ((not (equal? action #f)) (action exp env))
+
+        ((application? exp)
+         (xapply (xeval (operator exp) env)
+		 (list-of-values (operands exp) env)))
+        (else
+         (error "Unknown expression type -- XEVAL " exp)))))
+
+(define (xapply procedure arguments)
+  (cond ((primitive-procedure? procedure)
+         (apply-primitive-procedure procedure arguments))
+        ((user-defined-procedure? procedure)
+         (eval-sequence
+           (procedure-body procedure)
+           (xtend-environment
+             (procedure-parameters procedure)
+             arguments
+             (procedure-environment procedure))))
+        (else
+         (error
+          "Unknown procedure type -- XAPPLY " procedure))))
+
+;;; Handling procedure arguments
+
+(define (list-of-values exps env)
+  (if (no-operands? exps)
+      '()
+      (cons (xeval (first-operand exps) env)
+            (list-of-values (rest-operands exps) env))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;; Special-Forms: Each Special form is represented as a procedure
+;;; taking an exp and env. (eval exp env)
+;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;Converted the eval-lambda into a procedure that has only 2 arguments this
+;;allows the lookup table to work correctly.
+(define (eval-lambda exp env)
+  (make-procedure (lambda-parameters exp)
+                  (lambda-body exp)
+                  env))
+
+;;Wrap the text-of-quotation into a procedure that takes two arguments so that
+;;each special form takes an exp and an env.
+(define (eval-quote exp env)
+  (text-of-quotation exp))
+
+;;Wrap begin into a procedure that takes two arguments.
+(define (eval-begin exp env)
+  (eval-sequence (begin-actions exp) env))
+
+;;Wrap cond into a procedure that takes two arguments.
+(define (eval-cond exp env)
+  (xeval (cond->if exp) env))
+  
+(define (eval-if exp env)
+  (if (true? (xeval (if-predicate exp) env))
+      (xeval (if-consequent exp) env)
+      (xeval (if-alternative exp) env)))
+
+;;Returns true if the symbol is defined in the current environment. Modified
+;;from lookup-variable.
+(define (eval-defined? exp env)
+  (if (lookup-variable-value-alt (car (cdr exp)) env)
+      #t
+      #f))
+
+;;Returns true if the symbol is define in the first frame of the current
+;;environment. Loops through first frame until it finds the variable or the
+;;frame is empty.
+(define (eval-locally-defined? exp env)
+  (let ((first (first-frame env))
+        (var (car (cdr exp))))
+    (cond
+      ((null? (car first)) #f)
+      ((equal? var (car (car first)))
+       #t)
+      (else
+       (eval-locally-defined? exp
+                              (list (list (cdr (car first))
+                                          (cdr (cdr first)))))))))
+
+
+;;Removes the symbol binding from every frame in the current environment. This
+;;is the same as locally-make-unbound!, except it checks locally-make-unbound!
+;;until the environment is empty.
+(define (eval-make-unbound! exp env)
+
+  ;;If variable is defined in environment, then we should remove it, otherwise
+  ;;we just return the empty list.
+  (cond
+   ((eval-defined? exp env)
+    (remove-var-in-frame exp env))
+   (else
+    '())))
+
+;;Removes the symbol binding from the first frame in the current environment.
+;;Check the position in which the variable is to be removed, if it is found, it
+;;removes the item at that position in the variable and values list. Then it
+;;sets the local frame back to those lists.
+(define (eval-locally-make-unbound! exp env)
+  (let ((local (first-frame env)))
+
+    ;;var holds the list without "exp"
+    (define var
+      (remove-val-at-pos (car local)
+                  (remove-pos (car (cdr exp)) (car local) 0) 0))
+
+    ;;val holds the list without "exp" value
+    (define val
+      (remove-val-at-pos (cdr local)
+                  (remove-pos (car (cdr exp)) (car local) 0) 0))
+        
+    (cond
+     ;;If variable is locally-defined? then we set-car! and set-cdr! the new
+     ;;frame and return the empty list
+     ((eval-locally-defined? exp env)
+      (set-car! local var)
+      (set-cdr! local val)
+      '())
+     
+     ;;If variable is not locally-defined? then we do nothing, and return the
+     ;;empty list
+      (else
+       '())
+      )))
+
+;;Special form to load file in scheme
+(define eval-load
+  (lambda (exp env)
+    (define (filename exp) (cadr exp))
+    (define thunk (lambda ()
+		    (readfile)
+		    ))
+    (define readfile (lambda()
+		       (let ((item (read)))
+			 (if (not (eof-object? item))
+			     (begin
+			       (xeval item env)
+			       (readfile))))
+		       ))
+    (with-input-from-file (filename exp) thunk)
+    (filename exp)      
+    ))
+
+(define (eval-sequence exps env)
+  (cond ((last-exp? exps) (xeval (first-exp exps) env))
+        (else (xeval (first-exp exps) env)
+              (eval-sequence (rest-exps exps) env))))
+
+(define (eval-assignment exp env)
+  (let ((name (assignment-variable exp)))
+    (set-variable-value! name
+			 (xeval (assignment-value exp) env)
+			 env)
+  name))    ;; A & S return 'ok
+
+(define (eval-definition exp env)
+  (let ((name (definition-variable exp)))
+    (define-variable! name
+      (xeval (definition-value exp) env)
+      env)
+  name))     ;; A & S return 'ok
+
+;;Same as tagged-list? but returns the type if a pair. Otherwise false.
+(define (type-of exp)
+    (cond ((pair? exp) (car exp))
+          (else #f)))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;;	 Representing expressions
+;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;; Numbers, strings, and booleans are all represented as themselves.
+;;; (Not characters though; they don't
+;;; seem to work out as well because of an interaction
+;;; with read and display.)
+
+(define (self-evaluating? exp)
+  (or (number? exp)
+      (string? exp)
+      (boolean? exp)
+      ))
+
+;;; variables -- represented as symbols
+
+(define (variable? exp) (symbol? exp))
+
+;;; quote -- represented as (quote <text-of-quotation>)
+
+(define (quoted? exp)
+  (tagged-list? exp 'quote))
+
+(define (text-of-quotation exp) (cadr exp))
+
+(define (tagged-list? exp tag)
+  (if (pair? exp)
+      (eq? (car exp) tag)
+      #f))
+
+;;; assignment -- represented as (set! <var> <value>)
+
+(define (assignment? exp) 
+  (tagged-list? exp 'set!))
+
+(define (assignment-variable exp) (cadr exp))
+
+(define (assignment-value exp) (caddr exp))
+
+;;; definitions -- represented as (define <var> <value>)
+;;;  or (define (<var>
+;;;  <parameter_1> <parameter_2> ... <parameter_n>) <body>)
+;;;
+;;; The second form is immediately turned into
+;;;the equivalent lambda expression.
+
+(define (definition? exp)
+  (tagged-list? exp 'define))
+
+(define (definition-variable exp)
+  (if (symbol? (cadr exp))
+      (cadr exp)
+      (caadr exp)))
+
+(define (definition-value exp)
+  (if (symbol? (cadr exp))
+      (caddr exp)
+      (make-lambda (cdadr exp)
+                   (cddr exp))))
+
+;;; lambda expressions -- represented as (lambda ...)
+;;;
+;;; That is, any list starting with lambda.  The list must have at
+;;; least one other element, or an error will be generated.
+
+(define (lambda? exp) (tagged-list? exp 'lambda))
+
+(define (lambda-parameters exp) (cadr exp))
+(define (lambda-body exp) (cddr exp))
+
+(define (make-lambda parameters body)
+  (cons 'lambda (cons parameters body)))
+
+;;; conditionals -- (if <predicate> <consequent> <alternative>?)
+
+(define (if? exp) (tagged-list? exp 'if))
+
+(define (if-predicate exp) (cadr exp))
+
+(define (if-consequent exp) (caddr exp))
+
+(define (if-alternative exp)
+  (if (not (null? (cdddr exp)))
+      (cadddr exp)
+      #f))
+
+(define (make-if predicate consequent alternative)
+  (list 'if predicate consequent alternative))
+
+
+;;; sequences -- (begin <list of expressions>)
+
+(define (begin? exp) (tagged-list? exp 'begin))
+
+(define (begin-actions exp) (cdr exp))
+
+(define (last-exp? seq) (null? (cdr seq)))
+(define (first-exp seq) (car seq))
+(define (rest-exps seq) (cdr seq))
+
+(define (sequence->exp seq)
+  (cond ((null? seq) seq)
+        ((last-exp? seq) (first-exp seq))
+        (else (make-begin seq))))
+
+(define (make-begin seq) (cons 'begin seq))
+
+
+;;; procedure applications -- any compound expression that is not
+;;one of the above expression types.
+
+(define (application? exp) (pair? exp))
+(define (operator exp) (car exp))
+(define (operands exp) (cdr exp))
+
+(define (no-operands? ops) (null? ops))
+(define (first-operand ops) (car ops))
+(define (rest-operands ops) (cdr ops))
+
+
+;;; Derived expressions -- the only one we include initially is cond,
+;;; which is a special form that is syntactically transformed into a
+;;; nest of if expressions.
+
+(define (cond? exp) (tagged-list? exp 'cond))
+
+(define (cond-clauses exp) (cdr exp))
+
+(define (cond-else-clause? clause)
+  (eq? (cond-predicate clause) 'else))
+
+(define (cond-predicate clause) (car clause))
+
+(define (cond-actions clause) (cdr clause))
+
+(define (cond->if exp)
+  (expand-clauses (cond-clauses exp)))
+
+(define (expand-clauses clauses)
+  (if (null? clauses)
+      #f                          ; no else clause -- return #f
+      (let ((first (car clauses))
+            (rest (cdr clauses)))
+        (if (cond-else-clause? first)
+            (if (null? rest)
+                (sequence->exp (cond-actions first))
+                (error "ELSE clause isn't last -- COND->IF "
+                       clauses))
+            (make-if (cond-predicate first)
+                     (sequence->exp (cond-actions first))
+                     (expand-clauses rest))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;;	 Truth values and procedure objects
+;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;; Truth values
+
+(define (true? x)
+  (not (eq? x #f)))
+
+(define (false? x)
+  (eq? x #f))
+
+
+;;; Procedures
+
+(define (make-procedure parameters body env)
+  (list 'procedure parameters body env))
+
+(define (user-defined-procedure? p)
+  (tagged-list? p 'procedure))
+
+
+(define (procedure-parameters p) (cadr p))
+(define (procedure-body p) (caddr p))
+(define (procedure-environment p) (cadddr p))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;;	 Representing environments
+;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;; An environment is a list of frames.
+
+(define (enclosing-environment env) (cdr env))
+
+(define (first-frame env) (car env))
+
+(define the-empty-environment '())
+
+;;; Each frame is represented as a pair of lists:
+;;;   1.  a list of the variables bound in that frame, and
+;;;   2.  a list of the associated values.
+
+(define (make-frame variables values)
+  (cons variables values))
+
+(define (frame-variables frame) (car frame))
+(define (frame-values frame) (cdr frame))
+
+(define (add-binding-to-frame! var val frame)
+  (set-car! frame (cons var (car frame)))
+  (set-cdr! frame (cons val (cdr frame))))
+;;; Extending an environment
+
+(define (xtend-environment vars vals base-env)
+  (if (= (length vars) (length vals))
+      (cons (make-frame vars vals) base-env)
+      (if (< (length vars) (length vals))
+          (error "Too many arguments supplied " vars vals)
+          (error "Too few arguments supplied " vars vals))))
+
+;;; Looking up a variable in an environment
+
+(define (lookup-variable-value var env)
+  (define (env-loop env)
+    (define (scan vars vals)
+      (cond ((null? vars)
+             (env-loop (enclosing-environment env)))
+            ((eq? var (car vars))
+             (car vals))
+            (else (scan (cdr vars) (cdr vals)))))
+    (if (eq? env the-empty-environment)
+        (error "Unbound variable " var)
+        (let ((frame (first-frame env)))
+          (scan (frame-variables frame)
+                (frame-values frame)))))
+  (env-loop env))
+
+;;; Setting a variable to a new value in a specified environment.
+;;; Note that it is an error if the variable is not already present
+;;; (i.e., previously defined) in that environment.
+
+(define (set-variable-value! var val env)
+  (define (env-loop env)
+    (define (scan vars vals)
+      (cond ((null? vars)
+             (env-loop (enclosing-environment env)))
+            ((eq? var (car vars))
+             (set-car! vals val))
+            (else (scan (cdr vars) (cdr vals)))))
+    (if (eq? env the-empty-environment)
+        (error "Unbound variable -- SET! " var)
+        (let ((frame (first-frame env)))
+          (scan (frame-variables frame)
+                (frame-values frame)))))
+  (env-loop env))
+
+;;; Defining a (possibly new) variable.  First see if the variable
+;;; already exists.  If it does, just change its value to the new
+;;; value.  If it does not, define the new variable in the current
+;;; frame.
+
+(define (define-variable! var val env)
+  (let ((frame (first-frame env)))
+    (define (scan vars vals)
+      (cond ((null? vars)
+             (add-binding-to-frame! var val frame))
+            ((eq? var (car vars))
+             (set-car! vals val))
+            (else (scan (cdr vars) (cdr vals)))))
+    (scan (frame-variables frame)
+          (frame-values frame))))
+
+;;; Define the primitive procedures
+
+(define (primitive-procedure? proc)
+  (tagged-list? proc 'primitive))
+
+(define (primitive-implementation proc) (cadr proc))
+
+;;; Here is where we rely on the underlying Scheme implementation to
+;;; know how to apply a primitive procedure.
+
+(define (apply-primitive-procedure proc args)
+  (apply (primitive-implementation proc) args))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;;	 The main driver loop
+;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;; Note that (read) returns an internal representation of the next
+;;; Scheme expression from the input stream.  It does NOT evaluate
+;;; what is typed in -- it just parses it and returns an internal
+;;; representation.  It is the job of the scheme evaluator to perform
+;;; the evaluation.  In this case, our evaluator is called xeval.
+
+(define input-prompt "s450==> ")
+
+(define (s450)
+  (prompt-for-input input-prompt)
+  (let ((input (read)))
+    (let ((output (xeval input the-global-environment)))
+      (user-print output)))
+  (s450))
+
+(define (prompt-for-input string)
+  (newline) (newline) (display string))
+
+;;; Note that we would not want to try to print a representation of the
+;;; <procedure-env> below -- this would in general get us into an
+;;; infinite loop.
+
+(define (user-print object)
+  (if (user-defined-procedure? object)
+      (display (list 'user-defined-procedure
+                     (procedure-parameters object)
+                     (procedure-body object)
+                     '<procedure-env>))
+      (display object)))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;;	 Here we go:  define the global environment and invite the
+;;;        user to run the evaluator.
+;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define the-global-environment '())
+
+(display "... loaded the metacircular evaluator. (s450) runs it.")
+(newline)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;;
+;;;     Helper Procedures
+;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;Helper procedure to find the position in list that variable needs to be
+;;removed.
+(define (remove-pos val seq count)
+  (cond
+   ((null? seq) -1)
+   ((equal? val (car seq)) count)
+   (else (remove-pos val (cdr seq) (+ count 1)))))
+
+;;Helper procedure to remove the variable from each frame
+(define (remove-var-in-frame exp env)
+  (cond
+   ((null? env) '())
+   (else
+    (eval-locally-make-unbound! exp env)
+    (remove-var-in-frame exp (cdr env)))))
+
+;;Helper procedure to remove variable at position in list.
+(define (remove-val-at-pos seq count count2)
+  (cond ((null? seq) '())
+        ((equal? count count2)
+         (append '() (remove-val-at-pos (cdr seq) count (+ count2 1))))
+        (else (cons (car seq)
+                    (remove-val-at-pos  (cdr seq) count (+ count2 1)))
+              )))
+
+;;Alternative version of lookup-variable-value that returns false if not found,
+;;not an error. This allows an easy way to find if a variable if "defined?"
+(define (lookup-variable-value-alt var env)
+  (define (env-loop env)
+    (define (scan vars vals)
+      (cond ((null? vars)
+             (env-loop (enclosing-environment env)))
+            ((eq? var (car vars))
+             (car vals))
+            (else (scan (cdr vars) (cdr vals)))))
+    (if (eq? env the-empty-environment)
+        #f
+        (let ((frame (first-frame env)))
+          (scan (frame-variables frame)
+                (frame-values frame)))))
+  (env-loop env))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;; Install-special-form: Creates lookup table
+;;;
+;;; Install-primitive-procedure: Inserts primitive procedures into
+;;; global environment.
+;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;Implementation of a lookup table from Scheme textbook
+(define (lookup key table)
+  (let ((record (assocm key (cdr table))))
+    (if record
+        (cdr record)
+        #f)))
+
+(define (assocm key records)
+  (cond ((null? records) #f)
+        ((equal? key (caar records)) (car records))
+        (else (assocm key (cdr records)))))
+
+(define (insert! key value table)
+  (let ((record (assocm key (cdr table))))
+    (if record
+        (set-cdr! record value)
+        (set-cdr! table
+                  (cons (cons key value) (cdr table)))))
+  key) 
+
+(define (make-table)
+  (list '*table*))
+
+;;Table to hold all of the speceial-forms
+(define special-form (make-table))
+
+;;Procedure that installs a special form with name, and action
+(define (install-special-form name action)
+  (cond
+    ;;Checks if name is defined in the global environment, if it is, then it
+    ;;throws an error.
+    ((eval-defined? (list 'garbage name) the-global-environment)
+     (error "Special form has same name as variable -- " name))
+    ;;Cannot reinstall a special form if it is already in the special form
+    ;;table. throws an error
+    ((NOT(equal? (lookup name special-form) #f))
+     (error "Cannot reinstall special form -- " name))
+    (else
+     (insert! name action special-form))))
+
+;;Each special form is a procedure that takes 2 arguments
+(install-special-form 'quote                 eval-quote) 
+(install-special-form 'define                eval-definition)   
+(install-special-form 'if                    eval-if)
+(install-special-form 'set!                  eval-assignment)
+(install-special-form 'lambda                eval-lambda)
+(install-special-form 'begin                 eval-begin)
+(install-special-form 'cond                  eval-cond)
+(install-special-form 'defined?              eval-defined?)
+(install-special-form 'locally-defined?      eval-locally-defined?)
+(install-special-form 'make-unbound!         eval-make-unbound!)
+(install-special-form 'locally-make-unbound! eval-locally-make-unbound!)
+
+;;Primitive procedure installation
+(define (install-primitive-procedure name action)
+  (cond
+    ;;If the global environment is empty then install-primitive procedure
+    ;;creates the base for it. Otherwise we add a binding to the only frame
+    ;;within the environment.
+    ((NOT(equal? (lookup name special-form) #f))
+     (error "Cannot install primitive with name of special form -- " name))
+
+    ;;If the global environment is null, we insert the first frame into the
+    ;;environment.
+    ((null? the-global-environment)
+    (set! the-global-environment
+          (list (make-frame (list name) (list (list 'primitive action))))))
+    ;;If the global environment is not null, we add the variable and value to
+    ;;the first frame of the environment.
+    (else
+     (add-binding-to-frame! name (list 'primitive action)
+                            (car the-global-environment))))
+  name)
+
+;;Implemented some additional primitive procedures
+(install-primitive-procedure 'car car)
+(install-primitive-procedure 'cdr cdr)
+(install-primitive-procedure 'cons cons)
+(install-primitive-procedure 'null? null?)
+(install-primitive-procedure '+ +)
+(install-primitive-procedure '* *)
+(install-primitive-procedure 'display display)
+

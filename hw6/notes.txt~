@@ -1,0 +1,62 @@
+;;Answers to Homework Questions
+
+1.There are a number of aspects of the metacircular evaluator that differ from
+the standard UMB scheme.  I found that if I have any error at all, it kicks me
+out of the program, and back into the UMB scheme environment.  This does not
+happen in UMB scheme, because it can catch errors and knows that you do not want
+to leave the interpreter.  I also found that the s450 interpreter does not have
+many of the primitive procedures that UMB scheme has. The s450 interpreter
+allows you to redefine a special form as a variable, which should not be
+allowed. The primitive procedures are stored in root frame of the environment
+not in a table. This makes sense, because a primitive procedure is very similar
+to a user defined procedure, and user defined procedures are just stored as some
+variable.
+
+When executing (f 3 4) the procedure returned #t#t#f#f, because the variables
+are there when you call the procedure, but when the variables are unbound, then
+a, and b are not longer in the current environment.
+
+The primitive procedures are stored in the first frame of the global
+environment, not in a table like the special forms.
+
+;;Discussion Essay
+
+  I used the table from chapter three to make a special-form table needed in
+question 2.  I was confused at first why I was getting so many errors trying to
+evaluate the procedures from the lookup table, but I realized that I was trying
+to apply odd number of arguments to procedures that took one, two or three
+arguments. I fixed this by wrapping each special form that was given to use in a
+procedure that only took two arguments, the exp, and the environment. This
+reduced the code needed in the xeval procedure. This also helped with the
+install-special-form procedure because it would only ever be given a procedure
+that took two arguments.
+  My solution to problem 3 was to create a frame and insert it into the global
+environment. If the global environment already had a frame, then I would add a
+binding to the root frame each time install-primitive-procedure was called. If
+the root frame was empty, then there was a special case to start up the
+environment with a single frame.
+  I was able to display the special form, by checking in xeval, if the only
+value in "exp" was a special form symbol. If that was the case I would just
+display a message saying that it was a special form. I solved problem 5 with a
+similar method by adding a clause in xeval that checked if the symbol was either
+define, or set, and if the symbol was trying to redefine another special form it
+would throw an error.
+  Problem 6 was the most difficult part of this homework, and where I spent the
+most time.  I knew conceptually that to check if a symbol was defined in the
+current environment, I would need to check every frame up to the root frame, and
+if the symbol was not found I would return false.  To check if the symbol was
+locally defined I would only need to take the "car" of the current environment,
+and "cdr" the "var" list until I found the variable or returned false. To check
+if the "exp" was defined in the whole environment, I modified the procedure to
+lookup a variable, to return false if none was found, and used that for the
+"defined?" procedure.
+  Removing the symbol binding from every frame in the current environment was
+similar to seeing if a symbol was defined in the current environment. I would
+cdr the environment, and check remove the binding from that local environment,
+until the environment was empty. To remove the binding from the local
+environment, I took the list of variables, and values, and removed the specified
+variable and value then set-car! and set-cdr! the frame with the new variables
+and values.
+  To test my code I used the example given in the homework, as well as modifying
+that example to test for "defined?" and "make-unbound!". I created additional
+procedures that used more frames.

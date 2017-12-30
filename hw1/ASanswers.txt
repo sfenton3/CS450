@@ -1,0 +1,157 @@
+1.6) When Alyssa attempts to use this procedure to compute square roots, she
+will get stuck in a read-eval loop at (sqrt-iter (improve guess x) x) because
+the expression is being evaluated in applicative-order.  The reason we cannot
+define the special form "If" by using the special form "Cond" is because a
+user-defined procedure is evaluated in applicative-order. "If" and "Cond" are
+special forms that use normal-order evaluation, and have different semantic
+meaning when interpreted in scheme. By defining new-if as a user-defined
+procedure, we change the evaluation order from normal to applicative. We can see
+from the following examples that if we define the special form "Cond" as a
+user-defined procedure, the procedure evaluates the expression
+(applicative-order x) in applicative-order, and throws a division by zero
+error. This is similar to what we see with the square root procedure.
+
+(define (new-if predicate then-clause else-clause)
+  (cond (predicate then-clause)
+          (else else-clause)))
+
+
+(define (normal-order x)
+  (cond  ((= x 0) (/ 6 0)
+         (else 1)))
+
+(define (applicative-order x)
+  (new-if  (= x 0)
+           (/ 6 0)
+              1))
+              
+(normal-order 1);prints 1
+(applicative-order 1) ;Tries to evaluate (/ 6 0).division by zero error
+              
+
+1.12)
+;;First Cond clauses catch exceptions
+;;Second Cond clauses evaluate recursion
+(define (p r e)
+  (cond ((< r 0) "Cannot have negative rows")
+        ((< e 0) "Elements cannot be in a negative position")
+        ((> e r) "Cannot have more elements than rows")
+        (else
+          (cond ((= e 0) 1) ;;far left is 1
+                ((= r e) 1) ;;far right is 1
+          (else (+
+                (p (- r 1) e)       ;;up one to right
+                (p (- r 1) (- e 1)) ;;up one to left
+                ))))))
+
+;;Test cases - Fail
+(p -1 1)   ;Negative row
+(p 1 -1)   ;Negative element
+(p 3 6)    ;element cannot be greater than row number
+
+;;Test Cases - Pass
+(p 0 0)
+(p 2 1)
+(p 4 2)
+(p 12 6)
+(p 12 0)
+(p 12 12) 
+
+1.20) In normal-order evaluation of (gcd 206 40), there are 11 remainder
+operations performed. The recursion goes from 1 remainder operation, to 3
+remainder operations, 6 remainder operations, then 11 remainder operations. If
+we take the difference between each iteration of the gcd procedure, we get 2,3,5
+operations. These values represent the Fibonacci sequence, and if we had a
+number that took 5 iterations to find the gcd, I would expect the difference to
+look like 2,3,5,8. In applicative-order evaluation there were 4 remainder
+operations, 1 remainder operation for each gcd procedure call.
+
+;;Normal-order evaluation
+;;11 remainder operations
+(gcd1 206 40)
+
+(gcd 40 (remainder 206 40)) ;;1 remainder
+
+(gcd (remainder 206 40) (remainder 40 (remainder 206 40))) ;;3 remainder
+
+(gcd (remainder 40 (remainder 206 40)) (remainder (remainder 206 40) (remainder
+40 (remainder 206 40)))) ;;6 remainder
+
+(gcd (remainder (remainder 206 40) (remainder 40 (remainder 206 40)))
+(remainder (remainder 40 (remainder 206 40)) (remainder (remainder 206 40)
+(remainder 40 (remainder 206 40))))) ;;11 remainder
+
+;;Evaluate expression and reduce...
+
+(gcd 2 0)
+
+2
+
+;;Applicative-order evaluation
+;;4 remainder evaluations
+(gcd 206 40)
+(gcd 40 (remainder 206 40)) ;1 remainder
+(gcd 6 (remainder 40 6))    ;1 remainder
+(gcd 4 (remainder 6 4))     ;1 remainder
+(gcd 2 (remainder 4 2))     ;1 remainder
+(gcd 2 0)
+2
+
+1.17) I designed the mult-fast procedure by looking at the linear method, and
+figuring out how we can utilize the properties of multiplication to reduce the
+steps required.  If we were to multiply 20x20 using the linear method it would
+look like (20x20)+(20x19)+(20x18)...(20x1).  We can reduce the number of steps
+by realizing that (20x20) is the same as (40x10), or (80x5). Since
+multiplication is a commutative operation, as long as "b" in (* a b) is even,
+then "a" can be doubled, and "b" can be halved. This reduces the number of
+iterations by half, changing the number of steps from linear to logarithmic. The
+examples below show how the expression is evaluated in linear and logarithmic
+time. For testing, I included four "cond" clauses that evaluate if "a" is
+positive or negative, and if "b" is positive or negative. The else statement
+catches a multiplication of zero, because that is neither negative or positive,
+and bypasses the other clauses. Since multiplication is communitive, we can
+solve for a negative multiplied by a positive, or vice versa, by changing the
+order in which "a" and "b" appear in mult-fast procedure.
+
+
+(define (double a)
+  (+ a a))
+
+(define (halve a)
+  (/ a 2))
+
+(define (mult-fast a b)
+  (cond ((= b 0) 0)
+          ((even? b) (mult-fast (double a) (halve b)))
+          ((and (positive? a) (positive? b)) (+ a (mult-fast a (- b 1))))
+          ((and (negative? a) (negative? b)) (- (mult-fast a (+ b 1)) a))
+          ((and (positive? a) (negative? b)) (- (mult-fast a (+ b 1)) a))
+          ((and (negative? a) (positive? b)) (+ a (mult-fast a (- b 1))))
+          (else  (+ a (mult-fast a (- b 1))))))
+
+
+;;Test Cases
+(mult-fast 20 20)
+(mult-fast -20 -20)
+(mult-fast 20 -20)
+(mult-fast -20 20)
+(mult-fast 0 0)
+(mult-fast 1 0)
+(mult-fast 0 1)
+
+;;Example of 20x20 in linear time
+(+ 20 (20 19))
+(+ 20 20 (20 18))
+(+ 20 20 20 (20 17))
+...
+(+ 20 ... (20 0))       ;;20 steps
+
+
+;;Example of (20x20) in logarithmic time: (mult-fast 20 20)
+(mult-fast 40 10)
+(mult-fast 80 5)
+(+ 80 (mult-fast 80 4))
+(+ 80 (mult-fast 160 2))
+(+ 80 (mult-fast 320 1))
+(+ 80 320)              ;;6 steps
+

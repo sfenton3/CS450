@@ -1,0 +1,16 @@
+((continue)
+ (val)
+ (val)
+ (
+  (assign val (const #t))
+  (test (op false?) (reg val))
+  (branch (label false-branch2))
+ true-branch1
+  (assign val (const #t))
+  (goto (reg continue))
+ false-branch2
+  (assign val (const #f))
+  (goto (reg continue))
+ after-if3
+ )
+)
